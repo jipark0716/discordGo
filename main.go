@@ -3,16 +3,12 @@ package main
 import (
     "log"
     "github.com/sacOO7/gowebsocket"
-    "os"
-    "os/signal"
 )
 
 func main() {
-    interrupt := make(chan os.Signal, 1)
-    signal.Notify(interrupt, os.Interrupt)
-
     socket := gowebsocket.New("wss://gateway.discord.gg/")
 
+    first := true
     socket.OnConnected = func(socket gowebsocket.Socket) {
         log.Println("Connected to server");
     };
@@ -20,8 +16,12 @@ func main() {
         log.Println("Recieved connect error ", err)
     };
     socket.OnTextMessage = func(message string, socket gowebsocket.Socket) {
-        socket.SendText("{\"op\": 2,\"d\": {\"token\": \"NTcwNTMxMTk4MzQ3MjQ3NjE2.XMAilQ.EwooL9k3rFh63P7nL1CJ_e2JxXw\",\"intents\": 513,\"properties\": {\"$os\": \"linux\",\"$browser\": \"my_library\",\"$device\": \"my_library\"}}}")
+        if first {
+            socket.SendText("{\"op\": 2,\"d\": {\"token\": \"NTcwNTMxMTk4MzQ3MjQ3NjE2.XMAilQ.SzqJgFxGCv7Pjd3Eeox7RPqg9O4\",\"intents\": 513,\"properties\": {\"$os\": \"linux\",\"$browser\": \"my_library\",\"$device\": \"my_library\"}}}")
+            first = false
+        }
         log.Println("Recieved message " + message)
+        println()
     };
     socket.OnBinaryMessage = func(data [] byte, socket gowebsocket.Socket) {
         log.Println("Recieved binary data ", data)
@@ -37,12 +37,5 @@ func main() {
         return
     };
     socket.Connect()
-    for {
-        select {
-        case <-interrupt:
-            log.Println("interrupt")
-            socket.Close()
-            return
-        }
-    }
+    select{}
 }
