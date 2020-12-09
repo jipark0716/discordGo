@@ -1,104 +1,113 @@
 package discord
 
 import (
-    "log"
     "fmt"
-    "time"
-    "strconv"
+    "discord/event"
     "encoding/json"
     "github.com/sacOO7/gowebsocket"
 )
 
-type Client struct {
-    socket gowebsocket.Socket
-    token string
-    event Event
-    heartbeat int
-    sessionId string
-    seq int
+type EventAdapter struct {
+    OnMessage          func(data map[string]interface{}, soket gowebsocket.Socket)
+
+    OnDispatch         func(data map[string]interface{}, soket gowebsocket.Socket)
+    OnHeartbeat        func(data map[string]interface{}, soket gowebsocket.Socket)
+    OnIdentify         func(data map[string]interface{}, soket gowebsocket.Socket)
+    OnPresenceUpdate   func(data map[string]interface{}, soket gowebsocket.Socket)
+    OnVoiceStateUpdate func(data map[string]interface{}, soket gowebsocket.Socket)
+    OnVoiceServerPing  func(data map[string]interface{}, soket gowebsocket.Socket)
+    OnResume           func(data map[string]interface{}, soket gowebsocket.Socket)
+    OnReconnect        func(data map[string]interface{}, soket gowebsocket.Socket)
+    OnGuildMemberChunk func(data map[string]interface{}, soket gowebsocket.Socket)
+    OnInvalidSession   func(data map[string]interface{}, soket gowebsocket.Socket)
+    OnHello            func(data map[string]interface{}, soket gowebsocket.Socket)
+    OnHeartbeatAck     func(data map[string]interface{}, soket gowebsocket.Socket)
+
+    OnReady            func(data map[string]interface{}, soket gowebsocket.Socket)
+    OnMessageCreate    func(event event.MessageCreateEvent)
 }
 
-func Connect(token string) Client {
-    socket := gowebsocket.New("wss://gateway.discord.gg/")
-    this := Client{
-        socket: socket,
-        token: token,
-        event: NewEvent(),
+func NewEventAdapter() EventAdapter {
+    return EventAdapter{}
+}
+
+func (this *EventAdapter) onTextMessageEvent(message string, socket gowebsocket.Socket) {
+    var data map[string]interface{}
+    err := json.Unmarshal([]byte(message), &data)
+    if err != nil {
+        panic(err)
     }
-    this.event.OnHello = this.OnHello
-    this.event.OnReady = this.OnReady
-    this.event.OnMessage = this.OnMessage
-    socket.OnTextMessage = this.event.onTextMessageEvent
-    socket.OnConnected = func(socket gowebsocket.Socket) {
-        log.Println("Connected to server");
-    };
-    socket.OnConnectError = func(err error, socket gowebsocket.Socket) {
-        log.Println("Recieved connect error ", err)
-    };
-    socket.OnBinaryMessage = func(data [] byte, socket gowebsocket.Socket) {
-        log.Println("Recieved binary data ", data)
-    };
-    socket.OnPingReceived = func(data string, socket gowebsocket.Socket) {
-        log.Println("Recieved ping " + data)
-    };
-    socket.OnPongReceived = func(data string, socket gowebsocket.Socket) {
-        log.Println("Recieved pong " + data)
-    };
-    socket.OnDisconnected = func(err error, socket gowebsocket.Socket) {
-        log.Println("Disconnected from server ")
-        return
-    };
-    socket.Connect()
-    return this
-}
-
-func SendJson(data map[string]interface{}, socket gowebsocket.Socket) {
-    dataB, _ := json.Marshal(data)
-    socket.SendText(string(dataB))
-}
-
-func (this *Client) identify() (map[string]interface{}) {
-    return map[string]interface{}{
-        "op" : 2,
-        "d" : map[string]interface{}{
-            "token" : this.token,
-            "intents" : 513,
-            "properties" : map[string]interface{}{
-                "$os" : "window",
-                "$browser" : "lib",
-                "$device" : "lib",
-            },
-        },
-    }
-}
-
-func (this *Client) setHeartbeat(intval int, socket gowebsocket.Socket) {
-    if intval == 0 {
-        return
-    }
-    for {
-        time.Sleep(time.Millisecond * time.Duration(intval))
-        payload := map[string]interface{}{
-            "op" : 1,
-            "d" : this.seq,
+    println()
+    println(message)
+    println()
+    go func(data map[string]interface{}, socket gowebsocket.Socket) {
+        if this.OnMessage != nil {
+            this.OnMessage(data, socket)
         }
-        SendJson(payload, socket)
-    }
-}
+    }(data, socket)
+    go func(data map[string]interface{}, op string, socket gowebsocket.Socket) {
+        switch op {
+            case "0":
+                if this.OnDispatch != nil {
+                    this.OnDispatch(data, socket)
+                }
+            case "1":
+                if this.OnHeartbeat != nil {
+                    this.OnHeartbeat(data, socket)
+                }
+            case "2":
+                if this.OnIdentify != nil {
+                    this.OnIdentify(data, socket)
+                }
+            case "3":
+                if this.OnPresenceUpdate != nil {
+                    this.OnPresenceUpdate(data, socket)
+                }
+            case "4":
+                if this.OnVoiceStateUpdate != nil {
+                    this.OnVoiceStateUpdate(data, socket)
+                }
+            case "5":
+                if this.OnVoiceServerPing != nil {
+                    this.OnVoiceServerPing(data, socket)
+                }
+            case "6":
+                if this.OnResume != nil {
+                    this.OnResume(data, socket)
+                }
+            case "7":
+                if this.OnReconnect != nil {
+                    this.OnReconnect(data, socket)
+                }
+            case "8":
+                if this.OnGuildMemberChunk != nil {
+                    this.OnGuildMemberChunk(data, socket)
+                }
+            case "9":
+                if this.OnInvalidSession != nil {
+                    this.OnInvalidSession(data, socket)
+                }
+            case "10":
+                if this.OnHello != nil {
+                    this.OnHello(data, socket)
+                }
+            case "11":
+                if this.OnHeartbeatAck != nil {
+                    this.OnHeartbeatAck(data, socket)
+                }
+        }
+    }(data, fmt.Sprintf("%#v", data["op"]), socket)
 
-func (this *Client) OnHello(data map[string]interface{}, socket gowebsocket.Socket) {
-    intval, _ := strconv.Atoi(fmt.Sprintf("%v", data["d"].(map[string]interface{})["heartbeat_interval"]))
-    go this.setHeartbeat(intval, socket)
-    SendJson(this.identify(), socket)
-}
-
-func (this *Client) OnReady(data map[string]interface{}, socket gowebsocket.Socket) {
-    sessionId, _ := data["d"].(map[string]interface{})["session_id"].(string)
-    this.sessionId = sessionId
-}
-
-func (this *Client) OnMessage(data map[string]interface{}, socket gowebsocket.Socket) {
-    if seq, ok := data["s"].(int); ok {
-        this.seq = seq
-    }
+    go func(data map[string]interface{}, t string, socket gowebsocket.Socket){
+        switch t {
+            case "READY":
+                if this.OnReady != nil {
+                    this.OnReady(data, socket)
+                }
+            case "MESSAGE_CREATE":
+                if this.OnMessageCreate != nil {
+                    this.OnMessageCreate(event.NewMessageCreateEvent(data))
+                }
+        }
+    }(data, fmt.Sprintf("%v", data["t"]), socket)
 }
