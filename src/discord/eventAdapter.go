@@ -3,11 +3,14 @@ package discord
 import (
     "fmt"
     "discord/event"
+    "discord/http"
     "encoding/json"
     "github.com/sacOO7/gowebsocket"
 )
 
 type EventAdapter struct {
+    http http.Http
+
     OnMessage          func(data map[string]interface{}, soket gowebsocket.Socket)
 
     OnDispatch         func(data map[string]interface{}, soket gowebsocket.Socket)
@@ -27,8 +30,10 @@ type EventAdapter struct {
     OnMessageCreate    func(event event.MessageCreateEvent)
 }
 
-func NewEventAdapter() EventAdapter {
-    return EventAdapter{}
+func NewEventAdapter(http http.Http) *EventAdapter {
+    return &EventAdapter{
+        http: http,
+    }
 }
 
 func (this *EventAdapter) onTextMessageEvent(message string, socket gowebsocket.Socket) {
@@ -106,7 +111,7 @@ func (this *EventAdapter) onTextMessageEvent(message string, socket gowebsocket.
                 }
             case "MESSAGE_CREATE":
                 if this.OnMessageCreate != nil {
-                    this.OnMessageCreate(event.NewMessageCreateEvent(data))
+                    this.OnMessageCreate(event.NewMessageCreateEvent(data, this.http))
                 }
         }
     }(data, fmt.Sprintf("%v", data["t"]), socket)

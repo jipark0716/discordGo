@@ -5,6 +5,7 @@ import (
     "fmt"
     "time"
     "strconv"
+    "discord/http"
     "encoding/json"
     "github.com/sacOO7/gowebsocket"
 )
@@ -12,10 +13,11 @@ import (
 type Client struct {
     socket gowebsocket.Socket
     token string
-    eventAdapter EventAdapter
+    EventAdapter *EventAdapter
     heartbeat int
     sessionId string
     seq int
+    Http http.Http
 }
 
 func Connect(token string) Client {
@@ -23,12 +25,13 @@ func Connect(token string) Client {
     this := Client{
         socket: socket,
         token: token,
-        eventAdapter: NewEventAdapter(),
+        Http:http.NewHttp(token),
     }
-    this.eventAdapter.OnHello = this.OnHello
-    this.eventAdapter.OnReady = this.OnReady
-    this.eventAdapter.OnMessage = this.OnMessage
-    socket.OnTextMessage = this.eventAdapter.onTextMessageEvent
+    this.EventAdapter = NewEventAdapter(this.Http)
+    this.EventAdapter.OnHello = this.OnHello
+    this.EventAdapter.OnReady = this.OnReady
+    this.EventAdapter.OnMessage = this.OnMessage
+    socket.OnTextMessage = this.EventAdapter.onTextMessageEvent
     socket.OnConnected = func(socket gowebsocket.Socket) {
         log.Println("Connected to server");
     };

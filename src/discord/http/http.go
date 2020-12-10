@@ -1,11 +1,10 @@
-package discord
+package http
 
 import (
     "log"
     "fmt"
     "bytes"
     "net/http"
-    "discord/obj"
     "encoding/json"
 )
 
@@ -21,13 +20,11 @@ func NewHttp(token string) Http {
     }
 }
 
-func (this *Http) SendMessage(message obj.Message, channelId string) (*http.Response) {
-    return this.Post(fmt.Sprintf("/channels/%s/messages", channelId), message)
-}
-
 func (this *Http) Post(url string, body interface{}) (*http.Response) {
     url = baseUrl + url
     bodyB, _ := json.Marshal(body)
+    println(string(bodyB))
+    println(url)
     buff := bytes.NewBuffer(bodyB)
     req, _ := http.NewRequest("POST", url, buff)
     this.SetHeader(req)
@@ -42,5 +39,5 @@ func (this *Http) Post(url string, body interface{}) (*http.Response) {
 
 func (this *Http) SetHeader(req *http.Request) {
     req.Header.Add("Content-Type", "application/json")
-    req.Header.Add("Authorization", this.token)
+    req.Header.Add("Authorization", fmt.Sprintf("Bot %s", this.token))
 }
